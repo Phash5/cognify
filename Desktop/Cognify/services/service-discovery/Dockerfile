@@ -1,0 +1,77 @@
+# Service Discovery Dockerfile
+# Multi-stage build for optimized production image
+
+# Build stage
+FROM node:18-alpine AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production && npm cache clean --force
+
+# Production stage
+FROM node:18-alpine AS production
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S service-discovery -u 1001 -G nodejs
+
+# Set working directory
+WORKDIR /app
+
+# Copy node_modules from builder stage
+COPY --from=builder --chown=service-discovery:nodejs /app/node_modules ./node_modules
+
+# Copy application code
+COPY --chown=service-discovery:nodejs . .
+
+# Create necessary directories
+RUN mkdir -p logs tmp && \
+    chown -R service-discovery:nodejs logs tmp
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3004
+ENV HOST=0.0.0.0
+
+# Expose port
+EXPOSE 3004
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3004/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
+
+# Switch to non-root user
+USER service-discovery
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "src/server.js"]
+
+# OCI Image Labels
+LABEL org.opencontainers.image.title="Service Discovery"
+LABEL org.opencontainers.image.description="Service registry and discovery microservice for Cognify AI platform"
+LABEL org.opencontainers.image.version="1.0.0"
+LABEL org.opencontainers.image.authors="Cognify AI Team"
+LABEL org.opencontainers.image.url="https://github.com/cognify-ai/platform"
+LABEL org.opencontainers.image.source="https://github.com/cognify-ai/platform"
+LABEL org.opencontainers.image.vendor="Cognify AI"
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.created="2024-01-20T00:00:00Z"
+LABEL org.opencontainers.image.revision="main"

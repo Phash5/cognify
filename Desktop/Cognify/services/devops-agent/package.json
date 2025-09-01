@@ -1,0 +1,229 @@
+{
+  "name": "devops-agent",
+  "version": "1.0.0",
+  "description": "AI-powered DevOps automation service for deployment, infrastructure, monitoring, and configuration management",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --coverage --detectOpenHandles",
+    "test:watch": "jest --watch --detectOpenHandles",
+    "test:integration": "jest --testPathPattern=integration --detectOpenHandles",
+    "test:unit": "jest --testPathPattern=unit --detectOpenHandles",
+    "lint": "eslint src/ --ext .js",
+    "lint:fix": "eslint src/ --ext .js --fix",
+    "format": "prettier --write src/**/*.js",
+    "format:check": "prettier --check src/**/*.js",
+    "docker:build": "docker build -t devops-agent .",
+    "docker:run": "docker run -p 3003:3003 --env-file .env devops-agent",
+    "docker:dev": "docker-compose up --build",
+    "docker:prod": "docker-compose -f docker-compose.prod.yml up --build",
+    "health": "curl -f http://localhost:3003/health || exit 1",
+    "metrics": "curl -s http://localhost:3003/metrics",
+    "validate": "npm run lint && npm run format:check && npm run test",
+    "docs:generate": "swagger-jsdoc -d swaggerDef.js src/routes/*.js -o docs/swagger.json",
+    "security:audit": "npm audit --audit-level moderate",
+    "security:fix": "npm audit fix",
+    "clean": "rm -rf node_modules coverage dist logs tmp",
+    "prepare": "husky install",
+    "precommit": "lint-staged",
+    "prepush": "npm run validate"
+  },
+  "keywords": [
+    "devops",
+    "ai",
+    "automation",
+    "deployment",
+    "infrastructure",
+    "monitoring",
+    "configuration",
+    "microservice",
+    "express",
+    "nodejs",
+    "openai",
+    "kubernetes",
+    "docker",
+    "terraform",
+    "aws",
+    "azure",
+    "gcp"
+  ],
+  "author": "Cognify AI Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cognify-ai/devops-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cognify-ai/devops-agent/issues"
+  },
+  "homepage": "https://github.com/cognify-ai/devops-agent#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "helmet": "^7.1.0",
+    "cors": "^2.8.5",
+    "compression": "^1.7.4",
+    "express-rate-limit": "^7.1.5",
+    "express-slow-down": "^2.0.1",
+    "express-validator": "^7.0.1",
+    "joi": "^17.11.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "uuid": "^9.0.1",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.1",
+    "redis": "^4.6.10",
+    "ioredis": "^5.3.2",
+    "openai": "^4.20.1",
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "multer": "^1.4.5-lts.1",
+    "swagger-ui-express": "^5.0.0",
+    "swagger-jsdoc": "^6.2.8",
+    "prom-client": "^15.1.0",
+    "@opentelemetry/api": "^1.7.0",
+    "@opentelemetry/sdk-node": "^0.45.1",
+    "@opentelemetry/auto-instrumentations-node": "^0.40.3",
+    "@opentelemetry/exporter-jaeger": "^1.18.1",
+    "@opentelemetry/exporter-prometheus": "^0.45.1",
+    "@opentelemetry/instrumentation-express": "^0.34.1",
+    "@opentelemetry/instrumentation-http": "^0.45.1",
+    "@opentelemetry/instrumentation-redis-4": "^0.35.1",
+    "@opentelemetry/semantic-conventions": "^1.18.1",
+    "node-cron": "^3.0.3",
+    "lodash": "^4.17.21",
+    "moment": "^2.29.4",
+    "validator": "^13.11.0",
+    "sanitize-html": "^2.11.0",
+    "rate-limiter-flexible": "^4.0.1",
+    "express-timeout-handler": "^2.2.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.3",
+    "eslint": "^8.55.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-jest": "^27.6.0",
+    "eslint-plugin-security": "^1.7.1",
+    "prettier": "^3.1.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "@types/jest": "^29.5.8",
+    "redis-memory-server": "^0.7.0",
+    "nock": "^13.4.0",
+    "cross-env": "^7.0.3",
+    "wait-port": "^1.1.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/server.js",
+      "!src/**/*.test.js",
+      "!src/**/*.spec.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.js",
+      "**/?(*.)+(spec|test).js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ],
+    "testTimeout": 30000,
+    "verbose": true
+  },
+  "eslintConfig": {
+    "extends": [
+      "airbnb-base",
+      "plugin:jest/recommended",
+      "plugin:security/recommended"
+    ],
+    "env": {
+      "node": true,
+      "jest": true,
+      "es2022": true
+    },
+    "parserOptions": {
+      "ecmaVersion": 2022,
+      "sourceType": "module"
+    },
+    "rules": {
+      "no-console": "warn",
+      "no-unused-vars": "error",
+      "prefer-const": "error",
+      "no-var": "error",
+      "object-shorthand": "error",
+      "prefer-arrow-callback": "error",
+      "prefer-template": "error",
+      "template-curly-spacing": "error",
+      "arrow-spacing": "error",
+      "comma-dangle": ["error", "always-multiline"],
+      "semi": ["error", "always"],
+      "quotes": ["error", "single"],
+      "indent": ["error", 2],
+      "max-len": ["error", { "code": 120 }],
+      "no-trailing-spaces": "error",
+      "eol-last": "error",
+      "security/detect-object-injection": "off",
+      "import/no-extraneous-dependencies": ["error", { "devDependencies": ["**/*.test.js", "**/*.spec.js", "tests/**/*.js"] }]
+    }
+  },
+  "prettier": {
+    "semi": true,
+    "trailingComma": "es5",
+    "singleQuote": true,
+    "printWidth": 120,
+    "tabWidth": 2,
+    "useTabs": false,
+    "bracketSpacing": true,
+    "arrowParens": "always",
+    "endOfLine": "lf"
+  },
+  "lint-staged": {
+    "*.js": [
+      "eslint --fix",
+      "prettier --write",
+      "git add"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write",
+      "git add"
+    ]
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged",
+      "pre-push": "npm run validate",
+      "commit-msg": "commitlint -E HUSKY_GIT_PARAMS"
+    }
+  },
+  "nodemonConfig": {
+    "watch": [
+      "src"
+    ],
+    "ext": "js,json",
+    "ignore": [
+      "src/**/*.test.js",
+      "src/**/*.spec.js",
+      "node_modules",
+      "coverage",
+      "logs"
+    ],
+    "env": {
+      "NODE_ENV": "development"
+    },
+    "delay": 1000
+  }
+}

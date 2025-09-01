@@ -1,0 +1,325 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6.0
+    container_name: cognify-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-cognify}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./server/scripts/initDatabase.js:/docker-entrypoint-initdb.d/initDatabase.js:ro
+    networks:
+      - cognify-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis Cache (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: cognify-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cognify-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Service Discovery
+  service-discovery:
+    build:
+      context: ./services/service-discovery
+      dockerfile: Dockerfile
+    container_name: cognify-service-discovery
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3004
+      HOST: 0.0.0.0
+      REDIS_ENABLED: true
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TELEMETRY_ENABLED: ${TELEMETRY_ENABLED:-false}
+    ports:
+      - "3004:3004"
+    networks:
+      - cognify-network
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # AI Orchestrator Service
+  ai-orchestrator:
+    build:
+      context: ./services/ai-orchestrator
+      dockerfile: Dockerfile
+    container_name: cognify-ai-orchestrator
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3000
+      HOST: 0.0.0.0
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password}@mongodb:27017/${MONGO_DB_NAME:-cognify}?authSource=admin
+      REDIS_URL: redis://redis:6379
+      SERVICE_DISCOVERY_URL: http://service-discovery:3004
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    networks:
+      - cognify-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend AI Agent
+  frontend-agent:
+    build:
+      context: ./services/frontend-agent
+      dockerfile: Dockerfile
+    container_name: cognify-frontend-agent
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      HOST: 0.0.0.0
+      REDIS_URL: redis://redis:6379
+      SERVICE_DISCOVERY_URL: http://service-discovery:3004
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ORCHESTRATOR_URL: http://ai-orchestrator:3000
+    ports:
+      - "3001:3001"
+    networks:
+      - cognify-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Backend AI Agent
+  backend-agent:
+    build:
+      context: ./services/backend-agent
+      dockerfile: Dockerfile
+    container_name: cognify-backend-agent
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3002
+      HOST: 0.0.0.0
+      REDIS_URL: redis://redis:6379
+      SERVICE_DISCOVERY_URL: http://service-discovery:3004
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ORCHESTRATOR_URL: http://ai-orchestrator:3000
+    ports:
+      - "3002:3002"
+    networks:
+      - cognify-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Database AI Agent
+  database-agent:
+    build:
+      context: ./services/database-agent
+      dockerfile: Dockerfile
+    container_name: cognify-database-agent
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3003
+      HOST: 0.0.0.0
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password}@mongodb:27017/${MONGO_DB_NAME:-cognify}?authSource=admin
+      REDIS_URL: redis://redis:6379
+      SERVICE_DISCOVERY_URL: http://service-discovery:3004
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ORCHESTRATOR_URL: http://ai-orchestrator:3000
+    ports:
+      - "3003:3003"
+    networks:
+      - cognify-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # DevOps AI Agent
+  devops-agent:
+    build:
+      context: ./services/devops-agent
+      dockerfile: Dockerfile
+    container_name: cognify-devops-agent
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3005
+      HOST: 0.0.0.0
+      REDIS_URL: redis://redis:6379
+      SERVICE_DISCOVERY_URL: http://service-discovery:3004
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ORCHESTRATOR_URL: http://ai-orchestrator:3000
+    ports:
+      - "3005:3005"
+    networks:
+      - cognify-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Legacy Backend Server (for backward compatibility)
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: cognify-server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 5000
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-password}@mongodb:27017/${MONGO_DB_NAME:-cognify}?authSource=admin
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      SERVICE_DISCOVERY_URL: http://service-discovery:3004
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      - cognify-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      service-discovery:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.js"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    profiles:
+      - legacy
+
+  # Frontend Client
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: cognify-client
+    restart: unless-stopped
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:5000}
+      REACT_APP_ENVIRONMENT: ${REACT_APP_ENVIRONMENT:-development}
+    ports:
+      - "3000:80"
+    networks:
+      - cognify-network
+    depends_on:
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy (Production)
+  nginx:
+    image: nginx:alpine
+    container_name: cognify-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    networks:
+      - cognify-network
+    depends_on:
+      - client
+      - server
+    profiles:
+      - production
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  cognify-network:
+    driver: bridge
